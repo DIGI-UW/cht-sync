@@ -22,6 +22,8 @@ services:
       - POSTGRES_SCHEMA=${POSTGRES_SCHEMA}
       - POSTGRES_TABLE=${POSTGRES_TABLE}
     restart: always
+    networks:
+      cht-net:
 
   dbt:
     build: ./dbt/
@@ -37,3 +39,9 @@ services:
       - CHT_PIPELINE_BRANCH_URL=${CHT_PIPELINE_BRANCH_URL}
       - DATAEMON_INTERVAL=${DATAEMON_INTERVAL}
       - DBT_PACKAGE_TARBALL_URL=${DBT_PACKAGE_TARBALL_URL}
+    networks:
+      cht-net:
+
+networks:
+  cht-net:
+    name: ${CHT_NETWORK:-cht-net}
