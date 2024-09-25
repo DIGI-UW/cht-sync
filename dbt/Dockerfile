@@ -17,7 +17,8 @@ WORKDIR /dbt/
 COPY dbt-run.py dbt-run.py
 COPY .dbt .dbt
 COPY dbt_project.yml dbt_project.yml
-COPY seeds seeds
+RUN mkdir seeds
+COPY seeds/locations.csv seeds/locations.csv
 
 RUN mkdir old_manifest
 
