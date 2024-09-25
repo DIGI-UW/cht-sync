@@ -74,11 +74,6 @@ with open("/dbt/packages.yml", "w") as f:
 
 subprocess.run(["dbt", "deps", "--profiles-dir", ".dbt"])
 
-
-print("Running dbt seed")
-# Run dbt seed to load CSV files into the database
-subprocess.run(["dbt", "seed", "--profiles-dir", ".dbt"])
-
 # load old manifest from db
 with connection() as conn:
     with conn.cursor() as cur:
@@ -109,6 +104,10 @@ with connection() as conn:
             [package_json, new_manifest],
         )
         conn.commit()
+
+print("Running dbt seed")
+# Run dbt seed to load CSV files into the database
+subprocess.run(["dbt", "seed", "--profiles-dir", ".dbt"])
 
 # anything that changed, run a full refresh
 subprocess.run(
