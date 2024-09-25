@@ -105,10 +105,6 @@ with connection() as conn:
         )
         conn.commit()
 
-print("Running dbt seed")
-# Run dbt seed to load CSV files into the database
-subprocess.run(["dbt", "seed", "--profiles-dir", ".dbt"])
-
 # anything that changed, run a full refresh
 subprocess.run(
     [
@@ -128,6 +124,10 @@ subprocess.run(
 subprocess.run(
     ["dbt", "run", "--profiles-dir", ".dbt", "--select", "config.materialized:view"]
 )
+
+print("Running dbt seed")
+# Run dbt seed to load CSV files into the database
+subprocess.run(["dbt", "seed", "--profiles-dir", ".dbt", "--select", "location.csv"])
 
 while True:
     subprocess.run(
