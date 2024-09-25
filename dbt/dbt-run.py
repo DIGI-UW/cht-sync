@@ -74,6 +74,8 @@ with open("/dbt/packages.yml", "w") as f:
 
 subprocess.run(["dbt", "deps", "--profiles-dir", ".dbt"])
 
+
+print("Running dbt seed")
 # Run dbt seed to load CSV files into the database
 subprocess.run(["dbt", "seed", "--profiles-dir", ".dbt"])
 
