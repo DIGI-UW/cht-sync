@@ -26,87 +26,117 @@ def connection():
 # Create schema
 with connection() as conn:
     with conn.cursor() as cur:
-        cur.execute(f"""
+        cur.execute(
+            f"""
             CREATE SCHEMA IF NOT EXISTS {os.getenv('POSTGRES_SCHEMA')};
-        """)
+        """
+        )
     conn.commit()
 
 with connection() as conn:
     with conn.cursor() as cur:
-        cur.execute(f"""
+        cur.execute(
+            f"""
             CREATE TABLE IF NOT EXISTS
             {os.getenv('POSTGRES_SCHEMA')}._dataemon (
                 inserted_on TIMESTAMP DEFAULT NOW(),
                 packages jsonb, manifest jsonb
             )
-        """)
+        """
+        )
     conn.commit()
 
-package_json = '{}'
+package_json = "{}"
 
 if os.getenv("DBT_PACKAGE_TARBALL_URL"):
     print(os.getenv("DBT_PACKAGE_TARBALL_URL"))
     init_package = urlparse(os.getenv("DBT_PACKAGE_TARBALL_URL"))
-    package_json = json.dumps({"packages": [{
-          "tarball": init_package.geturl(),
-          "name": "packages"
-        }]})
+    package_json = json.dumps(
+        {"packages": [{"tarball": init_package.geturl(), "name": "packages"}]}
+    )
 
 if os.getenv("CHT_PIPELINE_BRANCH_URL"):
     init_package = urlparse(os.getenv("CHT_PIPELINE_BRANCH_URL"))
     if init_package.scheme in ["http", "https"]:
-        package_json = json.dumps({"packages": [{
-            "git": init_package._replace(fragment='').geturl(),
-            "revision": init_package.fragment
-        }]})
+        package_json = json.dumps(
+            {
+                "packages": [
+                    {
+                        "git": init_package._replace(fragment="").geturl(),
+                        "revision": init_package.fragment,
+                    }
+                ]
+            }
+        )
 
 with open("/dbt/packages.yml", "w") as f:
-  f.write(package_json)
+    f.write(package_json)
 
 subprocess.run(["dbt", "deps", "--profiles-dir", ".dbt"])
+
+# Run dbt seed to load CSV files into the database
+subprocess.run(["dbt", "seed", "--profiles-dir", ".dbt"])
 
 # load old manifest from db
 with connection() as conn:
     with conn.cursor() as cur:
-        cur.execute(f"""
+        cur.execute(
+            f"""
             SELECT manifest
             FROM {os.getenv('POSTGRES_SCHEMA')}._dataemon
             ORDER BY inserted_on DESC
-        """)
+        """
+        )
         manifest = cur.fetchone()
 
         # save to file if found
         if manifest and len(manifest) > 0:
-          with open("/dbt/old_manifest/manifest.json", "w") as f:
-              f.write(json.dumps(manifest[0]));
+            with open("/dbt/old_manifest/manifest.json", "w") as f:
+                f.write(json.dumps(manifest[0]))
 
         # run dbt ls to make sure current manifest is generated
-        subprocess.run(["dbt", "ls",  "--profiles-dir", ".dbt"])
+        subprocess.run(["dbt", "ls", "--profiles-dir", ".dbt"])
 
-        new_manifest = '{}'
+        new_manifest = "{}"
         with open("/dbt/target/manifest.json", "r") as f:
-          new_manifest = f.read()
+            new_manifest = f.read()
 
         cur.execute(
             f"INSERT INTO {os.getenv('POSTGRES_SCHEMA')}._dataemon "
             "(packages, manifest) VALUES (%s, %s);",
-            [package_json, new_manifest]
+            [package_json, new_manifest],
         )
         conn.commit()
 
 # anything that changed, run a full refresh
-subprocess.run(["dbt", "run",
-  "--profiles-dir",
-   ".dbt",
-   "--select",
-   "state:modified",
-    "--full-refresh",
-    "--state",
-    "./old_manifest"])
+subprocess.run(
+    [
+        "dbt",
+        "run",
+        "--profiles-dir",
+        ".dbt",
+        "--select",
+        "state:modified",
+        "--full-refresh",
+        "--state",
+        "./old_manifest",
+    ]
+)
 
 # run views (which may not have changed but need to be created)
-subprocess.run(["dbt", "run",  "--profiles-dir", ".dbt", "--select", "config.materialized:view"])
+subprocess.run(
+    ["dbt", "run", "--profiles-dir", ".dbt", "--select", "config.materialized:view"]
+)
 
 while True:
-    subprocess.run(["dbt", "run",  "--profiles-dir", ".dbt", "--exclude", "config.materialized:view"])
+    subprocess.run(
+        [
+            "dbt",
+            "run",
+            "--profiles-dir",
+            ".dbt",
+            "--exclude",
+            "config.materialized:view",
+        ]
+    )
     time.sleep(int(os.getenv("DATAEMON_INTERVAL") or 5))
